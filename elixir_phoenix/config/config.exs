@@ -61,6 +61,16 @@ config :logger, :console,
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
 
+config :joken,
+  default_signer: [
+    signer_alg: "HS512",
+    key_octet: "ouni#9HTi*sa<R!x0xtU4cg}4g$iH^JoEbu4D*n="
+  ]
+
+# TODO: Does this do anything at all?
+config :wax_,
+  update_metadata: true
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"

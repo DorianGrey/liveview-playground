@@ -14,13 +14,24 @@ defmodule ElixirPhoenixWeb.Router do
     plug :accepts, ["json"]
   end
 
+  pipeline :private do
+    plug ElixirPhoenix.AuthPlug
+  end
 
   scope "/", ElixirPhoenixWeb do
     pipe_through :browser
-    # get "/", PageController, :home
+
+    get "/set_jwt_cookie_and_redirect", SessionController, :set_jwt_cookie_and_redirect
 
     get "/", RedirectController, :index
     live "/login", LoginController
+    live "/registration", RegistrationController
+  end
+
+  scope "/app", ElixirPhoenixWeb do
+    pipe_through [:browser, :private]
+
+    live "/dashboard", DashboardController
   end
 
   # Other scopes may use custom stacks.

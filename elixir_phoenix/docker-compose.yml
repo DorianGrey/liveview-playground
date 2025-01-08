@@ -6,3 +6,8 @@ services:
       POSTGRES_PASSWORD: postgres
     ports:
       - 5432:5432
+  # Using Valkey (Redis fork) instead of Redis due to its licensing ... thing
+  inmemory:
+    image: valkey/valkey:8-alpine3.21
+    ports:
+      - 6379:6379

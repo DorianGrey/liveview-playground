@@ -5,13 +5,12 @@ defmodule ElixirPhoenixWeb.DashboardController do
 
   @impl true
   def render(assigns) do
-    # TODO: Actual impl.
     ~H"""
     <%= if @events == [] do %>
       <p>No events tracked yet.</p>
     <% else %>
       <table class="table-auto border-collapse">
-        <caption class="caption-top">Events received since login</caption>
+        <caption class="caption-top">Latest 10 events</caption>
         <thead>
           <th class="p2 border border-slate-500">Tag</th>
           <th class="p2 border border-slate-500">Timestamp</th>
@@ -31,17 +30,34 @@ defmodule ElixirPhoenixWeb.DashboardController do
 
   @impl true
   def mount(_params, _session, socket) do
-    if connected?(socket),
-      do: Phoenix.PubSub.subscribe(ElixirPhoenix.PubSub, "dashboard-events:updates")
+    if connected?(socket) do
+      topic_key = Application.get_env(:elixir_phoenix, :dashboard_event_topic)
+      # Unsub takes place automatically when process shuts down
+      Phoenix.PubSub.subscribe(ElixirPhoenix.PubSub, topic_key)
+    end
 
-    {:ok, assign(socket, events: [])}
+    events = fetch_initial_events()
+    Logger.debug("Found initial events=#{inspect(events)}")
+
+    {:ok, assign(socket, events: events)}
   end
 
   @impl true
   def handle_info(%{event: event, timestamp: timestamp}, socket) do
     Logger.info("Received event=#{inspect(event)} w/ timestamp=#{inspect(timestamp)}")
 
-    events = [%{event: event, timestamp: timestamp} | socket.assigns.events]
+    events =
+      [%{event: event, timestamp: timestamp} | socket.assigns.events]
+      |> Enum.take(10)
+
     {:noreply, assign(socket, events: events)}
+  end
+
+  defp fetch_initial_events do
+    event_key = Application.get_env(:elixir_phoenix, :dashboard_event_key)
+
+    Redix.command!(:redix, ["LRANGE", event_key, 0, 9])
+    # Important: Keys are en-/decoded as strings by default, need to deal with this
+    |> Enum.map(&Jason.decode!(&1, keys: :atoms))
   end
 end

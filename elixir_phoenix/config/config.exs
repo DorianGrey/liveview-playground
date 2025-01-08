@@ -9,7 +9,9 @@ import Config
 
 config :elixir_phoenix,
   ecto_repos: [ElixirPhoenix.Repo],
-  generators: [timestamp_type: :timestamptz]
+  generators: [timestamp_type: :timestamptz],
+  dashboard_event_key: "dashboard_events",
+  dashboard_event_topic: "dashboard-events:updates"
 
 # Configures the endpoint
 config :elixir_phoenix, ElixirPhoenixWeb.Endpoint,

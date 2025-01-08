@@ -18,7 +18,8 @@ defmodule ElixirPhoenix.Application do
       # {ElixirPhoenix.Worker, arg},
       # Start to serve requests, typically the last entry
       ElixirPhoenixWeb.Endpoint,
-      {Oban, Application.fetch_env!(:elixir_phoenix, Oban)}
+      {Oban, Application.fetch_env!(:elixir_phoenix, Oban)},
+      {Redix, name: :redix}
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

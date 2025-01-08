@@ -62,7 +62,8 @@ defmodule ElixirPhoenix.MixProject do
       {:joken, "~> 2.6"},
       {:puid, "~> 2.3"},
       {:cbor, "~> 1.0.0"},
-      {:oban, "~> 2.18"}
+      {:oban, "~> 2.18"},
+      {:redix, "~> 1.1"}
     ]
   end
 

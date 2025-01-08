@@ -17,7 +17,8 @@ defmodule ElixirPhoenix.Application do
       # Start a worker by calling: ElixirPhoenix.Worker.start_link(arg)
       # {ElixirPhoenix.Worker, arg},
       # Start to serve requests, typically the last entry
-      ElixirPhoenixWeb.Endpoint
+      ElixirPhoenixWeb.Endpoint,
+      {Oban, Application.fetch_env!(:elixir_phoenix, Oban)}
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

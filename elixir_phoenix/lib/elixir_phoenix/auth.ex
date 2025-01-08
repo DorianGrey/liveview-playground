@@ -269,7 +269,10 @@ defmodule ElixirPhoenix.Auth do
             :ok
 
           {:error, %Wax.MetadataStatementNotFoundError{}} ->
-            Logger.info("Did not find any metadata for AAGUID=#{inspect(aaguid)}, accepting it.")
+            # Note: Even if the Wax service to update stuff from the official FIDO alliance
+            # web resources, quite a few soft authenticators / tokens (e.g. tools like Bitwarden or 1Password)
+            # are NOT listed there.
+            Logger.info("Did not find any metadata to validate against for AAGUID=#{inspect(aaguid)}, accepting it.")
             :ok
 
           {:error, _} = error ->

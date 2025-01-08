@@ -30,7 +30,6 @@ defmodule ElixirPhoenixWeb.LoginController do
      |> assign(form: form, invalid: true, error: nil)}
   end
 
-  @spec handle_event(<<_::48, _::_*16>>, map(), map()) :: {:noreply, map()} | map()
   def handle_event("validate", %{"login" => login}, socket) do
     invalid = login |> String.trim() == ""
     {:noreply, assign(socket, :invalid, invalid)}

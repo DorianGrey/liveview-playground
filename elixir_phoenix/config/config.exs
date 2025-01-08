@@ -71,6 +71,17 @@ config :joken,
 config :wax_,
   update_metadata: true
 
+config :elixir_phoenix, Oban,
+  engine: Oban.Engines.Basic,
+  plugins: [
+    {Oban.Plugins.Cron,
+     crontab: [
+       {"* * * * *", ElixirPhoenix.Workers.SampleEventPublisher}
+     ]}
+  ],
+  queues: [default: 10],
+  repo: ElixirPhoenix.Repo
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"

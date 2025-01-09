@@ -63,7 +63,8 @@ defmodule ElixirPhoenix.MixProject do
       {:puid, "~> 2.3"},
       {:cbor, "~> 1.0.0"},
       {:oban, "~> 2.18"},
-      {:redix, "~> 1.1"}
+      {:redix, "~> 1.1"},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
     ]
   end
 

@@ -10,14 +10,21 @@ defmodule ElixirPhoenix.Auth do
   # 15 min lockout if attempted too often in a row
   @lockout_duration 900
 
+  # TODO: Add some types here, and try to make sure "check_rate_limit" does not fool us again
+
+  @spec create_jwt(non_neg_integer()) ::
+          {:ok, Joken.bearer_token(), Joken.claims()} | {:error, Joken.error_reason()}
   def create_jwt(account_id) do
     Jwt.generate_and_sign(%{"user_id" => account_id})
   end
 
+  @spec verify_jwt(Joken.bearer_token()) ::
+          {:ok, Joken.claims()} | {:error, Joken.error_reason()}
   def verify_jwt(token) do
     Jwt.verify_and_validate(token)
   end
 
+  @spec start_registration(String.t()) :: {:ok, Wax.Challenge.t()} | {:error, String.t()}
   def start_registration(username) do
     account_exists = Repo.exists?(from a in Account, where: a.principal == ^username)
 
@@ -37,6 +44,9 @@ defmodule ElixirPhoenix.Auth do
     end
   end
 
+  # TODO : More accurate types on "challenge_response"
+  @spec complete_registration(String.t(), binary(), Wax.Challenge.t(), map()) ::
+          {:ok} | {:error, any()}
   def complete_registration(
         username,
         generated_user_id,
@@ -104,9 +114,12 @@ defmodule ElixirPhoenix.Auth do
     end
   end
 
+  @spec start_login(String.t()) ::
+          {:ok, Wax.Challenge.t()} | {:error, %{code: String.t(), detail: DateTime.t() | nil}}
   def start_login(username) do
     account = Repo.get_by(Account, principal: username)
 
+    # TODO: FIx dialyzer
     if account do
       if account.locked_until && DateTime.compare(account.locked_until, DateTime.utc_now()) == :gt do
         {:error, %{code: "ACCOUNT_LOCKED", detail: account.locked_until}}
@@ -126,7 +139,8 @@ defmodule ElixirPhoenix.Auth do
             {:ok, {account.id, challenge}}
 
           {:error, details} ->
-            {:error, details}
+            # TODO: More formatting would be nice, right?
+            {:error, %{code: details, detail: nil}}
         end
       end
     else
@@ -142,16 +156,16 @@ defmodule ElixirPhoenix.Auth do
       "authenticatorData" => authenticator_data_b64,
       "sig" => sig_b64,
       "rawId" => credential_id_b64,
-      "type" => "public-key",
-      "userHandle" => maybe_user_handle_b64
+      "type" => "public-key"
+      # "userHandle" => maybe_user_handle_b64
     } = response
 
     authenticator_data_raw = Base.decode64!(authenticator_data_b64)
     sig_raw = Base.decode64!(sig_b64)
     # TODO: Check if we need this like in ... ever.
-    maybe_user_handle =
-      if maybe_user_handle_b64 <> "",
-        do: Base.decode64!(maybe_user_handle_b64)
+    # maybe_user_handle =
+    #   if maybe_user_handle_b64 <> "",
+    #     do: Base.decode64!(maybe_user_handle_b64)
 
     credentials_for_account = credentials_for_account(account_id)
     cred_id_aaguid_mapping = cred_aaguids_for_account(account_id)
@@ -177,28 +191,34 @@ defmodule ElixirPhoenix.Auth do
     end
   end
 
+  @spec check_rate_limit(%Account{}) :: :ok | {:error, String.t()}
   defp check_rate_limit(account) do
-    one_minute_ago = DateTime.utc_now() |> DateTime.add(-@rate_limit_window, :second)
-
-    query =
-      from a in LoginAttempt,
-        where: a.account_id == ^account.id and a.attempted_at >= ^one_minute_ago
-
-    recent_failure_count =
-      Repo.aggregate(
-        query,
-        :count
-      )
+    recent_failure_count = get_recent_failure_count(account)
 
     if recent_failure_count >= @max_attempts do
       locked_until = DateTime.utc_now() |> DateTime.add(@lockout_duration, :second)
-      Repo.update!(%Account{account | locked_until: locked_until})
+      updated_account = Account.changeset(account, %{locked_until: locked_until})
+      Repo.update!(updated_account)
 
       {:error,
        "Too many attempts within #{@rate_limit_window}. Account locked until #{locked_until}."}
     else
       :ok
     end
+  end
+
+  @spec get_recent_failure_count(%Account{}) :: non_neg_integer()
+  defp get_recent_failure_count(account) do
+    one_minute_ago = DateTime.utc_now() |> DateTime.add(-@rate_limit_window, :second)
+
+    query =
+      from a in LoginAttempt,
+        where: a.account_id == ^account.id and a.attempted_at >= ^one_minute_ago
+
+    Repo.aggregate(
+      query,
+      :count
+    ) || 0
   end
 
   defp log_failed_login_attempt(account_id) do
@@ -263,7 +283,7 @@ defmodule ElixirPhoenix.Auth do
       nil ->
         :ok
 
-        aaguid ->
+      aaguid ->
         case Wax.Metadata.get_by_aaguid(aaguid, challenge) do
           {:ok, _} ->
             :ok
@@ -272,7 +292,10 @@ defmodule ElixirPhoenix.Auth do
             # Note: Even if the Wax service to update stuff from the official FIDO alliance
             # web resources, quite a few soft authenticators / tokens (e.g. tools like Bitwarden or 1Password)
             # are NOT listed there.
-            Logger.info("Did not find any metadata to validate against for AAGUID=#{inspect(aaguid)}, accepting it.")
+            Logger.info(
+              "Did not find any metadata to validate against for AAGUID=#{inspect(aaguid)}, accepting it."
+            )
+
             :ok
 
           {:error, _} = error ->

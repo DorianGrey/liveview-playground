@@ -12,7 +12,7 @@ defmodule ElixirPhoenix.Account do
   @doc false
   def changeset(account, attrs) do
     account
-    |> cast(attrs, [:principal, :generated_id])
-    |> validate_required([:principal, :generated_id])
+    |> cast(attrs, [:principal, :generated_id, :locked_until])
+    |> validate_required([:principal, :generated_id, :locked_until])
   end
 end

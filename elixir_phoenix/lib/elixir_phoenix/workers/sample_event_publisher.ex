@@ -1,4 +1,5 @@
 defmodule ElixirPhoenix.Workers.SampleEventPublisher do
+  alias ElixirPhoenix.Workers.Event
   use Oban.Worker, queue: :default
 
   require Logger
@@ -8,14 +9,15 @@ defmodule ElixirPhoenix.Workers.SampleEventPublisher do
     Logger.info("Performing sample event publish")
     tag = Base.encode64(:crypto.strong_rand_bytes(16))
 
-    event = %{
+    event = %Event{
       event: tag,
       timestamp: DateTime.utc_now()
     }
 
-    :ok = save_event_to_redis(event)
+    :ok = save_event(event)
 
     topic_key = Application.get_env(:elixir_phoenix, :dashboard_event_topic)
+
     Phoenix.PubSub.broadcast(ElixirPhoenix.PubSub, topic_key, %{
       event: tag,
       timestamp: DateTime.utc_now()
@@ -24,7 +26,8 @@ defmodule ElixirPhoenix.Workers.SampleEventPublisher do
     :ok
   end
 
-  defp save_event_to_redis(event) do
+  @spec save_event(Event.t()) :: :ok
+  defp save_event(event) do
     event_key = Application.get_env(:elixir_phoenix, :dashboard_event_key)
     json_event = Jason.encode!(event)
 

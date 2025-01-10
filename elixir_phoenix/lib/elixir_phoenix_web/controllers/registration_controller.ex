@@ -36,7 +36,7 @@ defmodule ElixirPhoenixWeb.RegistrationController do
   end
 
   def handle_event("submit", %{"login" => login}, socket) do
-    generated_user_id = :crypto.strong_rand_bytes(64) # TODO: Maybe too long ... lol
+    generated_user_id = :crypto.strong_rand_bytes(16)
 
     case Auth.start_registration(login) do
       {:ok, challenge} ->
@@ -52,7 +52,7 @@ defmodule ElixirPhoenixWeb.RegistrationController do
               user: login,
               user_id: Base.encode64(generated_user_id),
               attestation: challenge.attestation,
-              timeout: 60000
+              timeout: Application.get_env(:elixir_phoenix, :webauthn_timeout_ms)
             }
           )
 
@@ -64,7 +64,6 @@ defmodule ElixirPhoenixWeb.RegistrationController do
   end
 
   def handle_event("finish_registration", %{"response" => response}, socket) do
-    # TODO
     challenge = socket.assigns.challenge
     username = socket.assigns.username
     generated_user_id = socket.assigns.generated_user_id
@@ -76,7 +75,6 @@ defmodule ElixirPhoenixWeb.RegistrationController do
            response
          ) do
       {:ok} ->
-        # TODO: Any kind of other notice? Flash?
         {
           :noreply,
           socket

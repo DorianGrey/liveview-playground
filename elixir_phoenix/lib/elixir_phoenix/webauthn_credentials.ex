@@ -7,7 +7,6 @@ defmodule ElixirPhoenix.WebauthnCredentials do
     field :account_id, :integer
     field :credential_id, :binary
     field :aaguid, :binary
-    field :sign_count, :integer
 
     timestamps(type: :utc_datetime_usec)
   end
@@ -15,7 +14,7 @@ defmodule ElixirPhoenix.WebauthnCredentials do
   @doc false
   def changeset(webauthn_credentials, attrs) do
     webauthn_credentials
-    |> cast(attrs, [:account_id, :credential_id, :public_key, :aaguid, :sign_count])
-    |> validate_required([:account_id, :credential_id, :public_key, :aaguid, :sign_count])
+    |> cast(attrs, [:account_id, :credential_id, :public_key, :aaguid])
+    |> validate_required([:account_id, :credential_id, :public_key, :aaguid,])
   end
 end

@@ -14,12 +14,16 @@ defmodule ElixirPhoenixWeb.Router do
     plug :accepts, ["json"]
   end
 
+  pipeline :public do
+    plug ElixirPhoenix.IsAnonymousPlug
+  end
+
   pipeline :private do
-    plug ElixirPhoenix.AuthPlug
+    plug ElixirPhoenix.IsAuthenticatedPlug
   end
 
   scope "/", ElixirPhoenixWeb do
-    pipe_through :browser
+    pipe_through [:browser, :public]
 
     get "/set_jwt_cookie_and_redirect", SessionController, :set_jwt_cookie_and_redirect
 

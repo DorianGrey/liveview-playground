@@ -43,6 +43,8 @@ defmodule ElixirPhoenixWeb.DashboardController do
   end
 
   @impl true
+  @spec handle_info(%{:event => any(), :timestamp => any(), optional(any()) => any()}, any()) ::
+          {:noreply, any()}
   def handle_info(%{event: event, timestamp: timestamp}, socket) do
     Logger.info("Received event=#{inspect(event)} w/ timestamp=#{inspect(timestamp)}")
 

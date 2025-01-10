@@ -49,7 +49,7 @@ defmodule ElixirPhoenixWeb.LoginController do
             %{
               challenge: Base.encode64(challenge.bytes),
               rp_id: challenge.rp_id,
-              timeout: 60000
+              timeout: Application.get_env(:elixir_phoenix, :webauthn_timeout_ms),
             }
           )
         }
@@ -60,16 +60,13 @@ defmodule ElixirPhoenixWeb.LoginController do
   end
 
   def handle_event("finish_login", %{"response" => response}, socket) do
-    # TODO: Ya... needs rework
-    # See https://github.com/tanguilp/wax_demo/blob/master/lib/wax_demo_web/controllers/credential_controller.ex
     challenge = socket.assigns.challenge
     account_id = socket.assigns.account_id
     Logger.debug("Finishing login using challenge=#{inspect(challenge)}")
-    # TODO: Fill.
     case Auth.finish_login(account_id, response, challenge) do
       {:ok, %{:token => token}} ->
-        # TODO: Generate jwt token and set via redirect
-        # put_resp_cookie("auth_token", token, http_only: true, max_age: 60 * 60 * 24)
+        # Need to redirect to a controller instead of another liveview
+        # to be able to set the cookie correctly.
         {:noreply, push_navigate(socket, to: "/set_jwt_cookie_and_redirect?jwt=#{token}")}
 
       {:error, reason} ->

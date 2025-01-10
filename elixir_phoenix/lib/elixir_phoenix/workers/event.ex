@@ -1,4 +1,5 @@
 defmodule ElixirPhoenix.Workers.Event do
+  @derive Jason.Encoder
   defstruct [:event, :timestamp]
 
   @type t :: %__MODULE__{

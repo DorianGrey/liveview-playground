@@ -1,5 +1,6 @@
-defmodule ElixirPhoenix.AuthPlug do
+defmodule ElixirPhoenix.IsAuthenticatedPlug do
   import Plug.Conn
+  import Phoenix.Controller
   alias ElixirPhoenix.Auth
 
   @behaviour Plug
@@ -11,8 +12,10 @@ defmodule ElixirPhoenix.AuthPlug do
   def call(conn, _opts) do
     case (conn |> fetch_cookies() |> Map.get(:cookies, %{}))["auth_token"] do
       nil ->
+        redirect_to = URI.encode(conn.request_path)
+
         conn
-        |> put_status(:unauthorized)
+        |> redirect(to: "/login?redirect_to=#{redirect_to}")
         |> halt()
 
       token ->
@@ -21,8 +24,11 @@ defmodule ElixirPhoenix.AuthPlug do
             assign(conn, :current_user, claims["sub"])
 
           {:error, _reason} ->
+            redirect_to = URI.encode(conn.request_path)
+
             conn
-            |> put_status(:unauthorized)
+            |> delete_resp_cookie("auth_token")
+            |> redirect(to: "/login?redirect_to=#{redirect_to}")
             |> halt()
         end
     end

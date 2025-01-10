@@ -11,7 +11,10 @@ config :elixir_phoenix,
   ecto_repos: [ElixirPhoenix.Repo],
   generators: [timestamp_type: :timestamptz],
   dashboard_event_key: "dashboard_events",
-  dashboard_event_topic: "dashboard-events:updates"
+  dashboard_event_topic: "dashboard-events:updates",
+  webauthn_origin: "http://localhost:4000",
+  webauthn_rp_id: "localhost",
+  webauthn_timeout_ms: 60000
 
 # Configures the endpoint
 config :elixir_phoenix, ElixirPhoenixWeb.Endpoint,

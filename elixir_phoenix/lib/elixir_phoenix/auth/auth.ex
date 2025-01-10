@@ -1,5 +1,12 @@
 defmodule ElixirPhoenix.Auth do
+  @moduledoc """
+  Implements the authorization features required / intended for this app, namely:
+  - Login
+  - Registration
+  - JWT generation & validation
+  """
   alias ElixirPhoenix.{Repo, Account, LoginAttempt, WebauthnCredentials, Jwt}
+  alias ElixirPhoenix.Auth.AuthError
   import Ecto.Query
 
   require Logger
@@ -9,8 +16,6 @@ defmodule ElixirPhoenix.Auth do
   @max_attempts 5
   # 15 min lockout if attempted too often in a row
   @lockout_duration 900
-
-  # TODO: Add some types here, and try to make sure "check_rate_limit" does not fool us again
 
   @spec create_jwt(non_neg_integer()) ::
           {:ok, Joken.bearer_token(), Joken.claims()} | {:error, Joken.error_reason()}
@@ -29,15 +34,15 @@ defmodule ElixirPhoenix.Auth do
     account_exists = Repo.exists?(from a in Account, where: a.principal == ^username)
 
     if account_exists do
-      # TODO: Ya... a bit unlikely to expose this detail.
+      # Ya... a bit unlikely to expose this detail. Would not do that in production.
       {:error, "ACCOUNT_EXISTS"}
     else
       challenge =
         Wax.new_registration_challenge(
           # Regularly, we have to use ENV to handle this
-          rp_id: "localhost",
-          origin: "http://localhost:4000",
-          timeout: 60000
+          rp_id: Application.get_env(:elixir_phoenix, :webauthn_rp_id),
+          origin: Application.get_env(:elixir_phoenix, :webauthn_origin),
+          timeout: Application.get_env(:elixir_phoenix, :webauthn_timeout_ms)
         )
 
       {:ok, challenge}
@@ -51,18 +56,14 @@ defmodule ElixirPhoenix.Auth do
         username,
         generated_user_id,
         challenge,
-        challenge_response
+        %{
+          "attestationObject" => attestation_object_b64,
+          "clientDataJSON" => client_data_json_raw,
+          "rawId" => raw_id_b64,
+          "type" => "public-key"
+        }
       ) do
-    # TODO: https://github.com/tanguilp/wax_demo/blob/master/lib/wax_demo_web/controllers/register_key_controller.ex
-
-    Logger.info("Received challenge_response = #{inspect(challenge_response)}")
-
-    %{
-      "attestationObject" => attestation_object_b64,
-      "clientDataJSON" => client_data_json_raw,
-      "rawId" => raw_id_b64,
-      "type" => "public-key"
-    } = challenge_response
+    # Based on: https://github.com/tanguilp/wax_demo/blob/master/lib/wax_demo_web/controllers/register_key_controller.ex
 
     attestation_object = Base.decode64!(attestation_object_b64)
 
@@ -75,7 +76,6 @@ defmodule ElixirPhoenix.Auth do
 
         # See https://aaguid.nicolasuter.ch/
         maybe_aaguid = Wax.AuthenticatorData.get_aaguid(authenticator_data)
-        Logger.debug("maybe_aaguid=#{inspect(maybe_aaguid)}")
 
         # This is COSE format, need to store everything.
         public_key =
@@ -115,50 +115,67 @@ defmodule ElixirPhoenix.Auth do
   end
 
   @spec start_login(String.t()) ::
-          {:ok, Wax.Challenge.t()} | {:error, %{code: String.t(), detail: DateTime.t() | nil}}
+          {:ok, {non_neg_integer(), Wax.Challenge.t()}} | {:error, %AuthError{}}
   def start_login(username) do
-    account = Repo.get_by(Account, principal: username)
+    # TODO: Fix dialyzer; still complains about s.th. that ends up here. Has to do with
+    # some of the `Repo` functions returning a `term()` which is just another way to tell
+    # "I don't known what is returned, might be anything".
+    # Aims at both `find_account_by_principal` and `start_login_for_account`.
+    account = find_account_by_principal(username)
 
-    # TODO: FIx dialyzer
     if account do
-      if account.locked_until && DateTime.compare(account.locked_until, DateTime.utc_now()) == :gt do
-        {:error, %{code: "ACCOUNT_LOCKED", detail: account.locked_until}}
-      else
-        case check_rate_limit(account) do
-          :ok ->
-            # TODO: Maybe set `allowCredentials` explicitly; beware of base64-encoding if so
-            # relying_party: %{id: "example.com", name: "ExampleApp"},
-            challenge =
-              Wax.new_authentication_challenge(
-                rp_id: "localhost",
-                allow_credentials: [],
-                timeout: 60000,
-                origin: "http://localhost:4000"
-              )
-
-            {:ok, {account.id, challenge}}
-
-          {:error, details} ->
-            # TODO: More formatting would be nice, right?
-            {:error, %{code: details, detail: nil}}
-        end
-      end
+      start_login_for_account(account)
     else
-      {:error, %{code: "NO_ACCOUNT", detail: nil}}
+      {:error, %AuthError{code: "NO_ACCOUNT", detail: nil}}
     end
   end
 
-  def finish_login(account_id, response, challenge) do
-    # TODO: Check via https://hexdocs.pm/wax_/Wax.html#authenticate/5
-    # TODO: Check if datastructure is correct
-    %{
-      "clientDataJSON" => client_data_json,
-      "authenticatorData" => authenticator_data_b64,
-      "sig" => sig_b64,
-      "rawId" => credential_id_b64,
-      "type" => "public-key"
-      # "userHandle" => maybe_user_handle_b64
-    } = response
+  @spec find_account_by_principal(String.t()) :: %Account{} | nil
+  defp find_account_by_principal(username) do
+    Account |> Repo.get_by(principal: username)
+  end
+
+  @spec start_login_for_account(%Account{}) ::
+          {:ok, {non_neg_integer(), Wax.Challenge.t()}} | {:error, %AuthError{}}
+  defp start_login_for_account(account) do
+    if account.locked_until && DateTime.compare(account.locked_until, DateTime.utc_now()) == :gt do
+      {:error, %AuthError{code: "ACCOUNT_LOCKED", detail: account.locked_until}}
+    else
+      case check_rate_limit(account) do
+        :ok ->
+          # TODO: Maybe set `allowCredentials` explicitly; beware of base64-encoding if so
+          # relying_party: %{id: "example.com", name: "ExampleApp"},
+          challenge =
+            Wax.new_authentication_challenge(
+              rp_id: Application.get_env(:elixir_phoenix, :webauthn_rp_id),
+              allow_credentials: [],
+              timeout: Application.get_env(:elixir_phoenix, :webauthn_timeout_ms),
+              origin: Application.get_env(:elixir_phoenix, :webauthn_origin)
+            )
+
+          {:ok, {account.id, challenge}}
+
+        other ->
+          other
+      end
+    end
+  end
+
+  @spec finish_login(non_neg_integer(), map(), %Wax.Challenge{}) ::
+          {:ok, %{token: Joken.bearer_token()}} | {:error, any()}
+  def finish_login(
+        account_id,
+        %{
+          "clientDataJSON" => client_data_json,
+          "authenticatorData" => authenticator_data_b64,
+          "sig" => sig_b64,
+          "rawId" => credential_id_b64,
+          "type" => "public-key"
+          # "userHandle" => maybe_user_handle_b64
+        },
+        challenge
+      ) do
+    # See https://hexdocs.pm/wax_/Wax.html#authenticate/5
 
     authenticator_data_raw = Base.decode64!(authenticator_data_b64)
     sig_raw = Base.decode64!(sig_b64)
@@ -185,13 +202,13 @@ defmodule ElixirPhoenix.Auth do
       {:ok, %{token: jwt_token}}
     else
       err ->
-        Logger.warning("Failed to authenticate: #{inspect(err)}")
+        Logger.warning("Failed to authenticate account=#{account_id}: #{inspect(err)}")
         log_failed_login_attempt(account_id)
         err
     end
   end
 
-  @spec check_rate_limit(%Account{}) :: :ok | {:error, String.t()}
+  @spec check_rate_limit(%Account{}) :: :ok | {:error, %AuthError{}}
   defp check_rate_limit(account) do
     recent_failure_count = get_recent_failure_count(account)
 
@@ -200,8 +217,13 @@ defmodule ElixirPhoenix.Auth do
       updated_account = Account.changeset(account, %{locked_until: locked_until})
       Repo.update!(updated_account)
 
-      {:error,
-       "Too many attempts within #{@rate_limit_window}. Account locked until #{locked_until}."}
+      {
+        :error,
+        %AuthError{
+          code:
+            "Too many attempts within #{@rate_limit_window}. Account locked until #{locked_until}."
+        }
+      }
     else
       :ok
     end
@@ -290,8 +312,9 @@ defmodule ElixirPhoenix.Auth do
 
           {:error, %Wax.MetadataStatementNotFoundError{}} ->
             # Note: Even if the Wax service to update stuff from the official FIDO alliance
-            # web resources, quite a few soft authenticators / tokens (e.g. tools like Bitwarden or 1Password)
-            # are NOT listed there.
+            # web resources (once I get the config right, though), soft authenticators / tokens
+            # (e.g. tools like Bitwarden or 1Password) are not always listed there, or become
+            # listed with a delay (they just pop up to frequently).
             Logger.info(
               "Did not find any metadata to validate against for AAGUID=#{inspect(aaguid)}, accepting it."
             )

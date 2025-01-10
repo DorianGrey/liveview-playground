@@ -7,7 +7,6 @@ defmodule ElixirPhoenix.Repo.Migrations.CreateWebauthnCredential do
       add :credential_id, :binary, null: false
       add :public_key, :binary, null: false
       add :aaguid, :binary
-      add :sign_count, :integer, default: 0, null: false
 
       timestamps(type: :timestamptz)
     end

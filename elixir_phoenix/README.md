@@ -1,18 +1,19 @@
 # ElixirPhoenix
+This is an implementation of the `LiveServer` tech using the [Phoenix Framework](https://www.phoenixframework.org/) in Elixir.
 
-To start your Phoenix server:
+# Get started for dev
 
-  * Run `mix setup` to install and setup dependencies
-  * Start Phoenix endpoint with `mix phx.server` or inside IEx with `iex -S mix phx.server`
+* Install Elixir and Erlang OTP as described in the specific [installation docs](https://elixir-lang.org/install.html)
+* (Optional) Install the Phoenix generator as described in their [installation docs](https://hexdocs.pm/phoenix/installation.html)
+* Start the required services using `docker compose up`
+* Prepare the database:
+    * `mix ecto.create`
+    * `mix ecto.migrate`
+* Start the Phoenix server via `mix phx.server`
 
 Now you can visit [`localhost:4000`](http://localhost:4000) from your browser.
 
-Ready to run in production? Please [check our deployment guides](https://hexdocs.pm/phoenix/deployment.html).
+# Experiences
 
-## Learn more
+< TODO >
 
-  * Official website: https://www.phoenixframework.org/
-  * Guides: https://hexdocs.pm/phoenix/overview.html
-  * Docs: https://hexdocs.pm/phoenix
-  * Forum: https://elixirforum.com/c/phoenix-forum
-  * Source: https://github.com/phoenixframework/phoenix
